@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZX Pixel Social</title>
+    <link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --pixel-green: #00ff00;
+            --pixel-blue: #0077ff;
+            --pixel-black: #000000;
+            --pixel-dark-gray: #1a1a1a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            scrollbar-width: thin;
+            scrollbar-color: var(--pixel-green) var(--pixel-black);
+        }
+
+        body {
+            font-family: 'VT323', monospace;
+            background-color: var(--pixel-black);
+            color: var(--pixel-green);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+
+        .pixel-button {
+            background-color: transparent;
+            border: 2px solid var(--pixel-green);
+            color: var(--pixel-green);
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'VT323', monospace;
+            text-transform: uppercase;
+        }
+
+        .pixel-button:hover {
+            background-color: var(--pixel-green);
+            color: var(--pixel-black);
+        }
+
+        .pixel-input {
+            width: 100%;
+            background-color: var(--pixel-dark-gray);
+            border: 2px solid var(--pixel-green);
+            color: var(--pixel-green);
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .post-container {
+            background-color: var(--pixel-dark-gray);
+            border: 2px solid var(--pixel-blue);
+            margin-bottom: 20px;
+            padding: 15px;
+            position: relative;
+        }
+
+        .post-media {
+            max-width: 100%;
+            max-height: 500px;
+            object-fit: contain;
+            border: 2px solid var(--pixel-green);
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--pixel-green);
+            color: var(--pixel-black);
+            padding: 10px 20px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: var(--pixel-black);
+            border: 3px solid var(--pixel-green);
+            padding: 20px;
+            width: 90%;
+            max-width: 500px;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        .loading {
+            text-align: center;
+            animation: blink 1s infinite;
+        }
+
+        .header-image {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="notification" class="notification"></div>
+
+    <div class="container">
+        <img src="https://img5.pic.in.th/file/secure-sv1/-6_20241105144123.png" alt="ZX Pixel Header" class="header-image">
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <input type="text" id="searchInput" class="pixel-input" placeholder="ค้นหาโพสต์">
+            <button onclick="app.searchPost()" class="pixel-button">🔍</button>
+        </div>
+
+        <button onclick="app.openPostModal()" class="pixel-button">+ สร้างโพสต์</button>
+
+        <div id="postContainer"></div>
+    </div>
+
+    <div id="postModal" class="modal">
+        <div class="modal-content">
+            <h2>สร้างโพสต์ใหม่</h2>
+            <input type="file" id="fileUpload" class="pixel-input" accept="image/*,video/*">
+            <textarea id="postDescription" class="pixel-input" placeholder="คำอธิบาย"></textarea>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="app.submitPost()" class="pixel-button">โพสต์</button>
+                <button onclick="app.closeModal()" class="pixel-button">ยกเลิก</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    class PixelSocialApp {
+        constructor() {
+            this.posts = [];
+            this.initializeApp();
+        }
+
+        initializeApp() {
+            this.loadPosts();
+            this.renderPosts();
+        }
+
+        loadPosts() {
+            try {
+                const savedPosts = localStorage.getItem('pixelSocialPosts');
+                this.posts = savedPosts ? JSON.parse(savedPosts) : [];
+            } catch (error) {
+                console.error("Error loading posts:", error);
+                this.posts = [];
+                this.showNotification("เกิดข้อผิดพลาดในการโหลดโพสต์");
+            }
+        }
+
+        savePosts() {
+            try {
+                localStorage.setItem('pixelSocialPosts', JSON.stringify(this.posts));
+            } catch (error) {
+                console.error("Error saving posts:", error);
+                this.showNotification("เกิดข้อผิดพลาดในการบันทึก");
+            }
+        }
+
+        renderPosts() {
+            const container = document.getElementById('postContainer');
+            container.innerHTML = this.posts.length 
+                ? this.posts.map(post => this.createPostHTML(post)).join('')
+                : '<div class="loading">ยังไม่มีโพสต์ ลองสร้างโพสต์แรกของคุณ</div>';
+        }
+
+        createPostHTML(post) {
+            return `
+                <div class="post-container" data-id="${post.id}">
+                    ${this.renderMediaContent(post)}
+                    <p>${post.description || 'ไม่มีคำอธิบาย'}</p>
+                    <div style="display: flex; justify-content: space-between; margin-top: 10px;">
+                        <button onclick="app.toggleLike('${post.id}')" class="pixel-button">
+                            ${post.likes > 0 ? '❤️' : '🤍'} ${post.likes}
+                        </button>
+                        <button onclick="app.deletePost('${post.id}')" class="pixel-button">🗑️</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        renderMediaContent(post) {
+            if (!post.file) return '';
+            const mediaType = post.type.startsWith('image') ? 'img' : 'video';
+            return `<${mediaType} 
+                src="${post.file}" 
+                class="post-media" 
+                ${mediaType === 'video' ? 'controls' : ''}>
+            `;
+        }
+
+        addPost(file, description) {
+            const newPost = {
+                id: Date.now().toString(),
+                file: file,
+                type: file.startsWith('data:image') ? 'image' : 'video',
+                description: description,
+                likes: 0,
+                createdAt: new Date().toISOString()
+            };
+
+            this.posts.unshift(newPost);
+            this.savePosts();
+            this.renderPosts();
+            this.showNotification("โพสต์สำเร็จ!");
+        }
+
+        toggleLike(postId) {
+            const post = this.posts.find(p => p.id === postId);
+            if (post) {
+                post.likes = post.likes ? 0 : 1;
+                this.savePosts();
+                this.renderPosts();
+            }
+        }
+
+        deletePost(postId) {
+            this.posts = this.posts.filter(p => p.id !== postId);
+            this.savePosts();
+            this.renderPosts();
+            this.showNotification("ลบโพสต์สำเร็จ");
+        }
+
+        showNotification(message) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.style.display = 'block';
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+
+        openPostModal() {
+            document.getElementById('postModal').style.display = 'flex';
+        }
+
+        closeModal() {
+            document.getElementById('postModal').style.display = 'none';
+            document.getElementById('fileUpload').value = '';
+            document.getElementById('postDescription').value = '';
+        }
+
+        submitPost() {
+            const fileUpload = document.getElementById('fileUpload');
+            const description = document.getElementById('postDescription').value;
+
+            if (!fileUpload.files.length) {
+                this.showNotification("กรุณาเลือกไฟล์");
+                return;
+            }
+
+            const file = fileUpload.files[0];
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                this.addPost(e.target.result, description);
+                this.closeModal();
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        searchPost() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const container = document.getElementById('postContainer');
+
+            if (!searchTerm) {
+                this.renderPosts();
+                return;
+            }
+
+            const filteredPosts = this.posts.filter(
+                post => post.description.toLowerCase().includes(searchTerm)
+            );
+
+            container.innerHTML = filteredPosts.length 
+                ? filteredPosts.map(post => this.createPostHTML(post)).join('')
+                : '<div class="loading">ไม่พบโพสต์</div>';
+        }
+    }
+
+    // Global app instance
+    const app = new PixelSocialApp();
+    </script>
+</body>
+</html>
